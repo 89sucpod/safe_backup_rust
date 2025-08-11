@@ -1,0 +1,3 @@
+Performed backup on sample.txt
+Performed restore on sample.txt
+Performed delete on data.txt
