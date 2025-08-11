@@ -1,86 +1,100 @@
-use std::fs;  
+use std::fs;
+use std::io::{self, Write};
+use std::path::Path;
 
-use std::io::{self, Write}; 
+fn main() {
+    // Prompt for file name
+    print!("Please enter your file name: ");
+    io::stdout().flush().unwrap();
+    let mut filename = String::new();
+    io::stdin().read_line(&mut filename).expect("Failed to read line");
+    let filename = filename.trim();
 
-fn main() {  
+    if filename.is_empty() {
+        eprintln!("Filename cannot be empty.");
+        return;
+    }
 
-// Ask user for file name 
-println!("Please enter your file name:");  
+    // Prompt for command
+    print!("Please enter your command (backup, restore, delete): ");
+    io::stdout().flush().unwrap();
+    let mut command = String::new();
+    io::stdin().read_line(&mut command).expect("Failed to read line");
+    let command = command.trim().to_lowercase();
 
-let mut filename = String::new();  
+    if !["backup", "restore", "delete"].contains(&command.as_str()) {
+        eprintln!("Unknown command.");
+        return;
+    }
 
-io::stdin().read_line(&mut filename).expect("Failed to read line");  
+    // Dispatch command
+    let result = match command.as_str() {
+        "backup" => backup_file(filename),
+        "restore" => restore_file(filename),
+        "delete" => delete_file(filename),
+        _ => unreachable!(),
+    };
 
-let filename = filename.trim(); // remove trailing newline 
+    if let Err(e) = result {
+        eprintln!("Error: {}", e);
+    }
+}
 
-// Ask user for command 
-println!("Please enter your command (backup, restore, delete):"); 
-let mut command = String::new(); 
-io::stdin().read_line(&mut command).expect("Failed to read line"); 
-let command = command.trim(); 
- 
-// Match command and call corresponding function 
-if command == "backup" { 
-    backup_file(filename); 
-} else if command == "restore" { 
-    restore_file(filename); 
-} else if command == "delete" { 
-    delete_file(filename); 
-} else { 
-    println!("Unknown command"); 
-} 
-  
+fn backup_file(filename: &str) -> io::Result<()> {
+    let backup_name = format!("{}.bak", filename);
 
-} 
+    // Check if original file exists
+    if !Path::new(filename).exists() {
+        eprintln!("Original file '{}' does not exist.", filename);
+        return Ok(());
+    }
 
-fn backup_file(filename: &str) {  
+    fs::copy(filename, &backup_name)?;
+    println!("Your backup created: {}", backup_name);
+    log_action(&format!("Performed backup on {}\n", filename))?;
+    Ok(())
+}
 
-let backup_name = format!("{}.bak", filename);  
+fn restore_file(filename: &str) -> io::Result<()> {
+    let backup_name = format!("{}.bak", filename);
 
-// Copy original file to backup file  
+    if !Path::new(&backup_name).exists() {
+        eprintln!("Backup file '{}' does not exist.", backup_name);
+        return Ok(());
+    }
 
-match fs::copy(filename, &backup_name) {  
+    fs::copy(&backup_name, filename)?;
+    println!("File restored from: {}", backup_name);
+    log_action(&format!("Performed restore on {}\n", filename))?;
+    Ok(())
+}
 
-Ok(_) => println!("Your Backup created: {}", backup_name),  
+fn delete_file(filename: &str) -> io::Result<()> {
+    if !Path::new(filename).exists() {
+        eprintln!("File '{}' does not exist.", filename);
+        return Ok(());
+    }
 
-Err(e) => println!("Failed to backup file: {}", e),  
+    print!("Are you sure you want to delete {}? (yes/no): ", filename);
+    io::stdout().flush()?;
 
-} 
+    let mut confirm = String::new();
+    io::stdin().read_line(&mut confirm)?;
+    if confirm.trim().eq_ignore_ascii_case("yes") {
+        fs::remove_file(filename)?;
+        println!("File deleted.");
+        log_action(&format!("Performed delete on {}\n", filename))?;
+    } else {
+        println!("Delete canceled.");
+    }
+    Ok(())
+}
 
-} 
-
-fn restore_file(filename: &str) {  
-
-let backup_name = format!("{}.bak", filename);  
-
-// Copy backup file to original file  
-
-match fs::copy(&backup_name, filename) { 
-
-Ok(_) => println!("File restored from: {}", backup_name),  
-
-Err(e) => println!("Failed to restore file: {}", e),  
-
-}  
-
-} 
-
-fn delete_file(filename: &str) { 
-
-print!("Are you sure you want to delete {}? (yes/no): ", filename);  
-
-io::stdout().flush().unwrap(); // Flush to show prompt immediately 
-
-let mut confirm = String::new(); 
-io::stdin().read_line(&mut confirm).expect("Failed to read line"); 
-if confirm.trim().to_lowercase() == "yes" { 
-    match fs::remove_file(filename) { 
-        Ok(_) => println!("File deleted."), 
-        Err(e) => println!("Failed to delete file: {}", e), 
-    } 
-} else { 
-    println!("Delete canceled."); 
-} 
-  
-
-} 
+fn log_action(action: &str) -> io::Result<()> {
+    let mut log_file = fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("logfile.txt")?;
+    log_file.write_all(action.as_bytes())?;
+    Ok(())
+}
