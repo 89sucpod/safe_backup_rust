@@ -4,7 +4,8 @@ use std::io::{self, Write};
 
 fn main() {  
 
-// Ask user for file name println!("Please enter your file name:");  
+// Ask user for file name 
+println!("Please enter your file name:");  
 
 let mut filename = String::new();  
 
